@@ -47,7 +47,8 @@ FDCAN_HandleTypeDef hfdcan2;
 
 FDCAN_RxHeaderTypeDef RxHeader;
 FDCAN_TxHeaderTypeDef TxHeader;
-uint8_t RxData[8]; // Buffer para dados (8 bytes para CAN Clássico)
+uint8_t RxData[8];
+uint8_t TxData[8];
 
 /* USER CODE END PV */
 
@@ -288,45 +289,97 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 {
     if((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != RESET)
     {
-
         if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &RxHeader, RxData) == HAL_OK)
         {
 
-            TxHeader.Identifier = RxHeader.Identifier;
-            TxHeader.IdType = RxHeader.IdType;
+            TxHeader.IdType = FDCAN_EXTENDED_ID;
             TxHeader.TxFrameType = FDCAN_DATA_FRAME;
-            TxHeader.DataLength = RxHeader.DataLength;
+            TxHeader.DataLength = FDCAN_DLC_BYTES_8;
             TxHeader.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
             TxHeader.BitRateSwitch = FDCAN_BRS_OFF;
             TxHeader.FDFormat = FDCAN_CLASSIC_CAN;
             TxHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
             TxHeader.MessageMarker = 0;
 
-
-
-
-            if (hfdcan->Instance == FDCAN1)
+            // =========================================================
+            // MENSAGEM 1: Base + 1h (0x01)
+            // =========================================================
+            if (RxHeader.Identifier == 0x00000001)
             {
+                TxHeader.Identifier = 0x00000001;
 
-                if (HAL_FDCAN_GetTxFifoFreeLevel(&hfdcan2) > 0)
-                {
-                    HAL_FDCAN_AddMessageToTxBuffer(&hfdcan2, &TxHeader, RxData, FDCAN_TX_BUFFER0);
+
+                TxData[0] = RxData[7];
+                TxData[1] = RxData[6];
+                TxData[2] = RxData[5];
+                TxData[3] = RxData[4];
+                TxData[4] = RxData[3];
+                TxData[5] = RxData[2];
+                TxData[6] = RxData[1];
+                TxData[7] = RxData[0];
+
+
+                if (hfdcan->Instance == FDCAN1) {
+                    HAL_FDCAN_AddMessageToTxBuffer(&hfdcan2, &TxHeader, TxData, FDCAN_TX_BUFFER0);
                     HAL_FDCAN_EnableTxBufferRequest(&hfdcan2, FDCAN_TX_BUFFER0);
                 }
             }
 
-            else if (hfdcan->Instance == FDCAN2)
+            // =========================================================
+            // MENSAGEM 2: Base + 5h (0x05)
+            // =========================================================
+            else if (RxHeader.Identifier == 0x00000005)
             {
-                if (HAL_FDCAN_GetTxFifoFreeLevel(&hfdcan1) > 0)
-                {
-                    HAL_FDCAN_AddMessageToTxBuffer(&hfdcan1, &TxHeader, RxData, FDCAN_TX_BUFFER0);
-                    HAL_FDCAN_EnableTxBufferRequest(&hfdcan1, FDCAN_TX_BUFFER0);
+                TxHeader.Identifier = 0x00000005;
+
+
+                TxData[0] = RxData[7];
+                // ...
+
+                if (hfdcan->Instance == FDCAN1) {
+                    HAL_FDCAN_AddMessageToTxBuffer(&hfdcan2, &TxHeader, TxData, FDCAN_TX_BUFFER0);
+                    HAL_FDCAN_EnableTxBufferRequest(&hfdcan2, FDCAN_TX_BUFFER0);
                 }
             }
+
+            // =========================================================
+            // MENSAGEM 3: Base + 7h (0x07)
+            // =========================================================
+            else if (RxHeader.Identifier == 0x00000007)
+            {
+                TxHeader.Identifier = 0x00000007;
+
+
+                TxData[0] = RxData[7];
+                // ...
+
+                if (hfdcan->Instance == FDCAN1) {
+                    HAL_FDCAN_AddMessageToTxBuffer(&hfdcan2, &TxHeader, TxData, FDCAN_TX_BUFFER0);
+                    HAL_FDCAN_EnableTxBufferRequest(&hfdcan2, FDCAN_TX_BUFFER0);
+                }
+            }
+
+            // =========================================================
+            // MENSAGEM 4: 0x521
+            // =========================================================
+            else if (RxHeader.Identifier == 0x00000521)
+            {
+                TxHeader.Identifier = 0x00000521;
+
+
+                TxData[0] = RxData[7];
+                // ...
+
+                if (hfdcan->Instance == FDCAN1) {
+                    HAL_FDCAN_AddMessageToTxBuffer(&hfdcan2, &TxHeader, TxData, FDCAN_TX_BUFFER0);
+                    HAL_FDCAN_EnableTxBufferRequest(&hfdcan2, FDCAN_TX_BUFFER0);
+                }
+            }
+
+
         }
     }
 }
-
 /* USER CODE END 4 */
 
 /**
