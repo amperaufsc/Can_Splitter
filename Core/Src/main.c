@@ -126,6 +126,38 @@ int main(void)
   if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK) { Error_Handler(); }
   if (HAL_FDCAN_ActivateNotification(&hfdcan2, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK) { Error_Handler(); }
 
+
+//Teste Loopback
+
+    TxHeader.Identifier = 0x00000001;
+    TxHeader.IdType = FDCAN_EXTENDED_ID;
+    TxHeader.TxFrameType = FDCAN_DATA_FRAME;
+    TxHeader.DataLength = FDCAN_DLC_BYTES_8;
+    TxHeader.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
+    TxHeader.BitRateSwitch = FDCAN_BRS_OFF;
+    TxHeader.FDFormat = FDCAN_CLASSIC_CAN;
+    TxHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
+    TxHeader.MessageMarker = 0;
+
+
+    TxData[0] = 0x11;
+    TxData[1] = 0x22;
+    TxData[2] = 0x33;
+    TxData[3] = 0x44;
+    TxData[4] = 0x55;
+    TxData[5] = 0x66;
+    TxData[6] = 0x77;
+    TxData[7] = 0x88;
+
+    HAL_FDCAN_AddMessageToTxBuffer(&hfdcan1, &TxHeader, TxData, FDCAN_TX_BUFFER0);
+    HAL_FDCAN_EnableTxBufferRequest(&hfdcan1, FDCAN_TX_BUFFER0);
+
+    /* USER CODE END 2 */
+
+    while (1)
+    {
+        // ...
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -197,7 +229,8 @@ static void MX_FDCAN1_Init(void)
   hfdcan1.Instance = FDCAN1;
   hfdcan1.Init.ClockDivider = FDCAN_CLOCK_DIV1;
   hfdcan1.Init.FrameFormat = FDCAN_FRAME_CLASSIC;
-  hfdcan1.Init.Mode = FDCAN_MODE_NORMAL;
+//hfdcan1.Init.Mode = FDCAN_MODE_NORMAL;
+  hfdcan1.Init.Mode = FDCAN_MODE_INTERNAL_LOOPBACK;
   hfdcan1.Init.AutoRetransmission = DISABLE;
   hfdcan1.Init.TransmitPause = DISABLE;
   hfdcan1.Init.ProtocolException = DISABLE;
@@ -240,7 +273,8 @@ static void MX_FDCAN2_Init(void)
   hfdcan2.Instance = FDCAN2;
   hfdcan2.Init.ClockDivider = FDCAN_CLOCK_DIV1;
   hfdcan2.Init.FrameFormat = FDCAN_FRAME_CLASSIC;
-  hfdcan2.Init.Mode = FDCAN_MODE_NORMAL;
+//hfdcan2.Init.Mode = FDCAN_MODE_NORMAL;
+  hfdcan2.Init.Mode = FDCAN_MODE_INTERNAL_LOOPBACK;
   hfdcan2.Init.AutoRetransmission = DISABLE;
   hfdcan2.Init.TransmitPause = DISABLE;
   hfdcan2.Init.ProtocolException = DISABLE;
@@ -309,14 +343,14 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
                 TxHeader.Identifier = 0x00000001;
 
 
-                TxData[0] = RxData[7];
-                TxData[1] = RxData[6];
-                TxData[2] = RxData[5];
-                TxData[3] = RxData[4];
-                TxData[4] = RxData[3];
-                TxData[5] = RxData[2];
-                TxData[6] = RxData[1];
-                TxData[7] = RxData[0];
+                TxData[0] = RxData[0];
+                TxData[1] = RxData[1];
+                TxData[2] = RxData[2];
+                TxData[3] = RxData[3];
+                TxData[4] = RxData[4];
+                TxData[5] = RxData[5];
+                TxData[6] = RxData[6];
+                TxData[7] = RxData[7];
 
 
                 if (hfdcan->Instance == FDCAN1) {
