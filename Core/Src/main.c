@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include <string.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -335,79 +336,93 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
             TxHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
             TxHeader.MessageMarker = 0;
 
+
             // =========================================================
             // MENSAGEM 1: Base + 1h (0x01)
             // =========================================================
             if (RxHeader.Identifier == 0x00000001)
             {
-                TxHeader.Identifier = 0x00000001;
 
+            	uint32_t raw_total_voltage = (RxData[5] << 24) | (RxData[6] << 16) | (RxData[3] << 8) | RxData[4];
 
-                TxData[0] = RxData[0];
-                TxData[1] = RxData[1];
-                TxData[2] = RxData[2];
-                TxData[3] = RxData[3];
-                TxData[4] = RxData[4];
-                TxData[5] = RxData[5];
-                TxData[6] = RxData[6];
-                TxData[7] = RxData[7];
+            	float float_total_voltage = (float)raw_total_voltage * 1.0f;
 
+            	memset(TxData, 0, 8);
 
-                if (hfdcan->Instance == FDCAN1) {
-                    HAL_FDCAN_AddMessageToTxBuffer(&hfdcan2, &TxHeader, TxData, FDCAN_TX_BUFFER0);
-                    HAL_FDCAN_EnableTxBufferRequest(&hfdcan2, FDCAN_TX_BUFFER0);
-                }
+            	memcpy(&TxData[0], &float_total_voltage, sizeof(float));
+
+            	TxData[4] = RxData[0]; // MIN CELL VOLTAGE
+            	TxData[5] = RxData[1]; // MAX CELL VOLTAGE
+            	TxData[6] = RxData[2]; // AVERAGE CELL VOLTAGE
+
             }
 
             // =========================================================
-            // MENSAGEM 2: Base + 5h (0x05)
-            // =========================================================
-            else if (RxHeader.Identifier == 0x00000005)
-            {
-                TxHeader.Identifier = 0x00000005;
-
-
-                TxData[0] = RxData[7];
-                // ...
-
-                if (hfdcan->Instance == FDCAN1) {
-                    HAL_FDCAN_AddMessageToTxBuffer(&hfdcan2, &TxHeader, TxData, FDCAN_TX_BUFFER0);
-                    HAL_FDCAN_EnableTxBufferRequest(&hfdcan2, FDCAN_TX_BUFFER0);
-                }
-            }
-
-            // =========================================================
-            // MENSAGEM 3: Base + 7h (0x07)
+            // MENSAGEM 2: Base + 7h (0x07)
             // =========================================================
             else if (RxHeader.Identifier == 0x00000007)
             {
-                TxHeader.Identifier = 0x00000007;
+
+            	uint32_t raw_protection = (RxData[0] << 24) | (RxData[1] << 16) | (RxData[2] << 8) | RxData[3];
+
+            	float float_protection = (float)raw_protection;
+
+            	memset(TxData, 0, 8);
+
+            	memcpy(&TxData[0], &float_protection, sizeof(float));
+
+            	TxData[4] = RxData[7];	 // BATTERY STATUS FLAGS
+            	TxData[5] = RxData[4];	 // REDUCTION FLAGS
+
+            	TxHeader.Identifier = 0x00000007;
+            }
+
+            // =========================================================
+            // MENSAGEM 3: Base + 5h (0x05)
+            // =========================================================
+            else if (RxHeader.Identifier == 0x00000005)
+            {
+
+                int16_t raw_current = (RxData[0] << 8) | RxData[1];
+
+                float float_current = (float)raw_current * 0.1f;
+
+                memset(TxData, 0, 8);
+
+                memcpy(&TxData[0], &float_current, sizeof(float));
 
 
-                TxData[0] = RxData[7];
-                // ...
+                TxData[4] = RxData[2]; // ESTIMATED CHARGE (MSB)
+                TxData[5] = RxData[3]; // ESTIMATED CHARGE (LSB)
 
-                if (hfdcan->Instance == FDCAN1) {
-                    HAL_FDCAN_AddMessageToTxBuffer(&hfdcan2, &TxHeader, TxData, FDCAN_TX_BUFFER0);
-                    HAL_FDCAN_EnableTxBufferRequest(&hfdcan2, FDCAN_TX_BUFFER0);
-                }
+                TxData[6] = RxData[6]; // USER STATE OF CHARGE
+                TxData[7] = RxData[7]; // STATE HEALTH
+
+            	TxHeader.Identifier = 0x00000005;
             }
 
             // =========================================================
             // MENSAGEM 4: 0x521
             // =========================================================
             else if (RxHeader.Identifier == 0x00000521)
-            {
+
+
+            	int32_t raw_current = (int32_t)((RxData[4] << 24) | (RxData[5] << 16) | (RxData[6] << 8) | RxData[7]);
+
+            	float float_current = (float)raw_current;
+
+
+            	memset(TxData, 0, 8);
+
+
+                memcpy(&TxData[0], &float_current, sizeof(float));
+
+
+                TxData[4] = RxData[3]; // MESSAGE TRACKER
+
+
+
                 TxHeader.Identifier = 0x00000521;
-
-
-                TxData[0] = RxData[7];
-                // ...
-
-                if (hfdcan->Instance == FDCAN1) {
-                    HAL_FDCAN_AddMessageToTxBuffer(&hfdcan2, &TxHeader, TxData, FDCAN_TX_BUFFER0);
-                    HAL_FDCAN_EnableTxBufferRequest(&hfdcan2, FDCAN_TX_BUFFER0);
-                }
             }
 
 
