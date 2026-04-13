@@ -1,0 +1,10 @@
+../Core/Src/main.c:82:5:main	1
+../Core/Src/main.c:129:6:SystemClock_Config	3
+../Core/Src/main.c:176:13:MX_FDCAN1_Init	3
+../Core/Src/main.c:255:13:MX_FDCAN2_Init	3
+../Core/Src/main.c:325:13:MX_TIM1_Init	4
+../Core/Src/main.c:372:13:MX_GPIO_Init	1
+../Core/Src/main.c:399:6:HAL_FDCAN_RxFifo0Callback	4
+../Core/Src/main.c:412:6:HAL_FDCAN_RxFifo1Callback	1
+../Core/Src/main.c:423:6:HAL_TIM_PeriodElapsedCallback	2
+../Core/Src/main.c:439:6:Error_Handler	1
