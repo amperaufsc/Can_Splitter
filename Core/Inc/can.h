@@ -12,7 +12,7 @@
 
 /** @brief Ativa a simulação interna da BMS (Envio de frames 0x01, 0x05, 0x07 no CAN1) */
 //#define testLoopbackCAN1
-//#define testLoopbackCAN2
+#define testLoopbackCAN2
 /* ==================== Defines de Sistema ============================= */
 
 /** @brief Maximum retries for adding message to TX FIFO */
@@ -24,6 +24,10 @@
 /** @brief Extended IDs for Vehicle Telemetry (CAN2) */
 #define CANSplitterID1  0x19308082
 #define CANSplitterID2  0x19318082
+
+/** @brief Error/Timeout IDs */
+#define CAN_ID_BMS_TIMEOUT  0x0D428081
+#define ERROR_CODE_BMS_LOST 1<<0
 
 /* ==================== Types ========================================== */
 

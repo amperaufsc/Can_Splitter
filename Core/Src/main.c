@@ -56,6 +56,8 @@ FDCAN_TxHeaderTypeDef FDCAN2TxHeader;
 uint8_t FDCAN2RxData[8];
 uint8_t FDCAN2TxData[8];
 
+bool bmsTimeoutLoopbackFlag = false;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -415,6 +417,12 @@ void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs)
 		if ((RxFifo1ITs & FDCAN_IT_RX_FIFO1_NEW_MESSAGE) != RESET) {
 			/* Receive message back for loopback verification */
 			HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO1, &FDCAN2RxHeader, FDCAN2RxData);
+			
+			if (FDCAN2RxHeader.Identifier == 0x0D428081) {
+				if (FDCAN2RxData[0] == 0x01) { // ERROR_CODE_BMS_LOST
+					bmsTimeoutLoopbackFlag = true;
+				}
+			}
 		}
 	}
 #endif

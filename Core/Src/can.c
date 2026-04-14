@@ -139,6 +139,14 @@ void CAN_TransmitTelemetry(void) {
     CAN_SimulateBMS();
 #endif
 
+    // Checagem de Timeout da BMS (3 segundos)
+    if ((HAL_GetTick() - emusBmsData.lastUpdateTick) > 3000) {
+        memset(txDataBuffer, 0, 8);
+        txDataBuffer[0] = ERROR_CODE_BMS_LOST; // Byte 0 = Error Code
+        // Transmite no barramento CAN2 para avisar Master e o Carregador
+        CAN_Transmit(&hfdcan2, CAN_ID_BMS_TIMEOUT, txDataBuffer, 8, FDCAN_EXTENDED_ID);
+    }
+
     // 1. ID 0x19308082: Total Voltage (4B Float) + Current (4B Float)
     memcpy(&txDataBuffer[0], &emusBmsData.totalVoltage, 4);
     memcpy(&txDataBuffer[4], &emusBmsData.current, 4);
