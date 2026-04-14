@@ -22,8 +22,8 @@
 #define CAN_TX_FAULT_THRESHOLD 10
 
 /** @brief Extended IDs for Vehicle Telemetry (CAN2) */
-#define CANSplitterID1  0x19308082
-#define CANSplitterID2  0x19318082
+#define CANSplitterID1  0x15408081
+#define CANSplitterID2  0x15418081
 
 /** @brief Error/Timeout IDs */
 #define CAN_ID_BMS_TIMEOUT  0x0D428081
