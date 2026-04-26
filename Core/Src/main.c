@@ -216,10 +216,10 @@ static void MX_FDCAN1_Init(void) // EMUS BMS CAN
 
   sFilterConfig.IdType = FDCAN_STANDARD_ID;
   sFilterConfig.FilterIndex = 0;
-  sFilterConfig.FilterType = FDCAN_FILTER_MASK;
+  sFilterConfig.FilterType = FDCAN_FILTER_RANGE;
   sFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
-  sFilterConfig.FilterID1 = 0;
-  sFilterConfig.FilterID2 = 0;
+  sFilterConfig.FilterID1 = 0x000;
+  sFilterConfig.FilterID2 = 0x7FF;
 
   if (HAL_FDCAN_ConfigFilter(&hfdcan1, &sFilterConfig) != HAL_OK) {
 	  Error_Handler();
@@ -403,9 +403,9 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 		if ((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != RESET) {
 			/* Retrieve message from hardware FIFO */
 			if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &FDCAN1RxHeader, FDCAN1RxData) == HAL_OK) {
-				
+				uint8_t dlc = FDCAN1RxHeader.DataLength;
 				// Processa a mensagem do BMS para telemetria estruturada
-				CAN_ProcessBMSMessage(FDCAN1RxHeader.Identifier, FDCAN1RxData);
+				CAN_ProcessBMSMessage(FDCAN1RxHeader.Identifier, FDCAN1RxData, dlc);
 			}
 		}
 	}
@@ -447,6 +447,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, RESET);
   /* User can add his own implementation to report the HAL error return state */
   __disable_irq();
   while (1)
