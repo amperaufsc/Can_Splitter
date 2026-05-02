@@ -10,32 +10,22 @@ Além de rotear os dados, ele opera como um cão de guarda (watchdog de rede), a
 
 O Microcontrolador tira proveito de dois periféricos FDCAN independentes para isolar completamente o ruidoso tráfego diagnóstico do BMS do tráfego limpo das Placas Lógicas Centrais.
 
-```mermaid
-graph LR
-    subgraph Rede Fechada da Bateria (CAN1)
-        BMS[EMUS BMS]
-    end
+```text
+   REDE BATERIA (CAN1)                MCU: CAN SPLITTER                REDE VEICULO (CAN2)
+  +-------------------+             +-------------------+             +-------------------+
+  |                   |             |                   |             |                   |
+  |     EMUS BMS      |------------>|   FDCAN1 (RX)     |------------>| CARREGADOR DILONG |
+  |                   |    (A)      |        |          |    (B)      |                   |
+  +-------------------+             |    WATCHDOG       |             +-------------------+
+                                    |        |          |
+                                    |   FDCAN2 (TX)     |             +-------------------+
+                                    |                   |------------>|   TMS MASTER      |
+                                    +-------------------+    (C)      |                   |
+                                                                      +-------------------+
 
-    subgraph MCU: CAN Splitter (Gateway Mestre)
-        RX[FDCAN1 RX : Decode de Mensagem]
-        WD[Monitor de Vitalidade de Rede]
-        TX[FDCAN2 TX : Retransmissor Lógico]
-    end
-
-    subgraph Rede Central do Veículo (CAN2)
-        CHARGER[Carregador Dilong]
-        MASTER[TMS Master Central]
-    end
-
-    BMS -- IDs 0x01, 0x05, 0x07, 0x20-0x3F --> RX
-    RX -->|Grava mem| WD
-    WD -->|Leitura Periódica| TX
-    
-    WD -- Falha > 3s --> |ID: 0x0D428081| CHARGER
-    WD -- Falha > 3s --> |ID: 0x0D428081| MASTER
-    
-    TX -- IDs de Telemetria: 0x15408081, 0x15418081 --> CHARGER
-    TX -- IDs de Telemetria: 0x15438081 a 0x15478081 --> MASTER
+  (A) Mensagens BMS: 0x01, 0x05, 0x07, 0x20-0x3F
+  (B) Telemetria Principal: 0x15408081, 0x15418081 (e Panic ID 0x0D428081)
+  (C) Telemetria Células: 0x15438081 a 0x15478081
 ```
 
 ---
