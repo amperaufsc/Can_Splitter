@@ -1033,10 +1033,14 @@ static void MX_FDCAN1_Init(void)
  8000906:	4b38      	ldr	r3, [pc, #224]	@ (80009e8 <MX_FDCAN1_Init+0xf4>)
  8000908:	2200      	movs	r2, #0
  800090a:	609a      	str	r2, [r3, #8]
+#ifdef testLoopbackCAN1
   hfdcan1.Init.Mode = FDCAN_MODE_EXTERNAL_LOOPBACK;
  800090c:	4b36      	ldr	r3, [pc, #216]	@ (80009e8 <MX_FDCAN1_Init+0xf4>)
  800090e:	2204      	movs	r2, #4
  8000910:	60da      	str	r2, [r3, #12]
+#else
+  hfdcan1.Init.Mode = FDCAN_MODE_NORMAL;
+#endif
   hfdcan1.Init.AutoRetransmission = DISABLE;
  8000912:	4b35      	ldr	r3, [pc, #212]	@ (80009e8 <MX_FDCAN1_Init+0xf4>)
  8000914:	2200      	movs	r2, #0
@@ -1217,10 +1221,14 @@ static void MX_FDCAN2_Init(void)
  8000a06:	4b38      	ldr	r3, [pc, #224]	@ (8000ae8 <MX_FDCAN2_Init+0xf4>)
  8000a08:	2200      	movs	r2, #0
  8000a0a:	609a      	str	r2, [r3, #8]
+#ifdef testLoopbackCAN2
   hfdcan2.Init.Mode = FDCAN_MODE_EXTERNAL_LOOPBACK;
  8000a0c:	4b36      	ldr	r3, [pc, #216]	@ (8000ae8 <MX_FDCAN2_Init+0xf4>)
  8000a0e:	2204      	movs	r2, #4
  8000a10:	60da      	str	r2, [r3, #12]
+#else
+  hfdcan2.Init.Mode = FDCAN_MODE_NORMAL;
+#endif
   hfdcan2.Init.AutoRetransmission = DISABLE;
  8000a12:	4b35      	ldr	r3, [pc, #212]	@ (8000ae8 <MX_FDCAN2_Init+0xf4>)
  8000a14:	2200      	movs	r2, #0

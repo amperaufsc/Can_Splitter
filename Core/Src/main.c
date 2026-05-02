@@ -191,7 +191,11 @@ static void MX_FDCAN1_Init(void)
   hfdcan1.Instance = FDCAN1;
   hfdcan1.Init.ClockDivider = FDCAN_CLOCK_DIV1;
   hfdcan1.Init.FrameFormat = FDCAN_FRAME_CLASSIC;
+#ifdef testLoopbackCAN1
   hfdcan1.Init.Mode = FDCAN_MODE_EXTERNAL_LOOPBACK;
+#else
+  hfdcan1.Init.Mode = FDCAN_MODE_NORMAL;
+#endif
   hfdcan1.Init.AutoRetransmission = DISABLE;
   hfdcan1.Init.TransmitPause = DISABLE;
   hfdcan1.Init.ProtocolException = DISABLE;
@@ -266,7 +270,11 @@ static void MX_FDCAN2_Init(void)
   hfdcan2.Instance = FDCAN2;
   hfdcan2.Init.ClockDivider = FDCAN_CLOCK_DIV1;
   hfdcan2.Init.FrameFormat = FDCAN_FRAME_CLASSIC;
+#ifdef testLoopbackCAN2
   hfdcan2.Init.Mode = FDCAN_MODE_EXTERNAL_LOOPBACK;
+#else
+  hfdcan2.Init.Mode = FDCAN_MODE_NORMAL;
+#endif
   hfdcan2.Init.AutoRetransmission = DISABLE;
   hfdcan2.Init.TransmitPause = DISABLE;
   hfdcan2.Init.ProtocolException = DISABLE;
