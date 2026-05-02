@@ -37,9 +37,17 @@ void CAN_Transmit(FDCAN_HandleTypeDef *hfdcan, uint32_t id, uint8_t *data, uint3
     pHeader->TxEventFifoControl = FDCAN_NO_TX_EVENTS;
     pHeader->MessageMarker = 0;
     
-    if (len == 0) pHeader->DataLength = FDCAN_DLC_BYTES_0;
-    else if (len <= 8) pHeader->DataLength = len;
-    else pHeader->DataLength = FDCAN_DLC_BYTES_8;
+    switch (len) {
+        case 0: pHeader->DataLength = FDCAN_DLC_BYTES_0; break;
+        case 1: pHeader->DataLength = FDCAN_DLC_BYTES_1; break;
+        case 2: pHeader->DataLength = FDCAN_DLC_BYTES_2; break;
+        case 3: pHeader->DataLength = FDCAN_DLC_BYTES_3; break;
+        case 4: pHeader->DataLength = FDCAN_DLC_BYTES_4; break;
+        case 5: pHeader->DataLength = FDCAN_DLC_BYTES_5; break;
+        case 6: pHeader->DataLength = FDCAN_DLC_BYTES_6; break;
+        case 7: pHeader->DataLength = FDCAN_DLC_BYTES_7; break;
+        default: pHeader->DataLength = FDCAN_DLC_BYTES_8; break;
+    }
 
     memcpy(pData, data, (len > 8) ? 8 : len);
 

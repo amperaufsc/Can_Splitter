@@ -27,15 +27,15 @@ graph LR
         MASTER[TMS Master Central]
     end
 
-    BMS -- IDs 0x01, 0x05, 0x07 --> RX
+    BMS -- IDs 0x01, 0x05, 0x07, 0x20-0x3F --> RX
     RX -->|Grava mem| WD
     WD -->|Leitura Periódica| TX
     
     WD -- Falha > 3s --> |ID: 0x0D428081| CHARGER
     WD -- Falha > 3s --> |ID: 0x0D428081| MASTER
     
-    TX -- IDs de Telemetria: 0x19308082, 0x19318082 --> CHARGER
-    TX -- IDs de Telemetria: 0x19308082, 0x19318082 --> MASTER
+    TX -- IDs de Telemetria: 0x15408081, 0x15418081 --> CHARGER
+    TX -- IDs de Telemetria: 0x15438081 a 0x15478081 --> MASTER
 ```
 
 ---
@@ -44,30 +44,40 @@ graph LR
 
 Todas as conversas advindas unicamente da Bateria caem no **FDCAN1**. A função `CAN_ProcessBMSMessage()` as decodifica preenchendo a global interna `emusBmsData` nos seguintes escopos:
  
-- **`ID 0x01`**: Lê dados do escopo de tensão e calcula as tensões Mínima, Máxima e Média das células, assim como o consolidado global em *Volts* para a CPU local.
-- **`ID 0x05`**: Capta a magnitude da corrente (em Amperes) fluindo na alta tensão e o percentual cravado de State Of Charge (SOC).
-- **`ID 0x07`**: Filtra as Flags de Segurança de hardware emitidos remotamente pela BMS antes do shutdown.
+- **`ID 0x01`**: Lê dados do escopo de tensão e calcula as tensões Mínima, Máxima e Média das células, assim como o consolidado global em *Volts*.
+- **`ID 0x05`**: Capta a magnitude da corrente (em Amperes) e o percentual de State Of Charge (SOC).
+- **`ID 0x07`**: Filtra as Flags de Segurança de hardware (proteções).
+- **`IDs 0x20 a 0x3F`**: Mapeia individualmente as tensões de até 40 células para monitoramento detalhado.
 
 ---
 
 ## 📤 Protocolo de Transmissão (Locutor do Carro)
 
-Apoiado na interrupção do **Timer 1 (`TIM1`)**, o pacote da variável limpa, estabilizada e unificada do Splitter é periodicamente repassado para a frente (**FDCAN2**) a todos os aparelhos sob 2 *Extended IDs*:
+Apoiado na interrupção do **Timer 1 (`TIM1`)**, o pacote consolidado do Splitter é enviado periodicamente para o **FDCAN2** utilizando *Extended IDs*:
 
-#### 1️⃣ Tensão e Corrente Totais - `ID 0x19308082`
+#### 1️⃣ Tensão e Corrente Totais - `ID 0x15408081`
 | Byte(s)   | Dado                   | Tipo Primitivo |
 |-----------|------------------------|----------------|
 | **0 - 3** | Tensão Pack            | `float` 32-bit |
 | **4 - 7** | Corrente Atual         | `float` 32-bit |
 
-#### 2️⃣ Estatísticas Menores e Alertas - `ID 0x19318082`
-| Byte(s)   | Dado                   | Escala          |
-|-----------|------------------------|-----------------|
-| **0 - 3** | Flags de Erro BMS      | Raw 32-bits     |
-| **4**     | Voltagem da Pior Célula| V * 50 (`uint8`)|
-| **5**     | Tensão da Melhor Célula| V * 50 (`uint8`)|
-| **6**     | Média Geral em Alta    | V * 50 (`uint8`)|
-| **7**     | SOC Direto             | % Direta (0-100)|
+#### 2️⃣ Estatísticas e SOC - `ID 0x15418081`
+| Byte(s)   | Dado                   | Escala / Tipo    |
+|-----------|------------------------|------------------|
+| **0 - 3** | Flags de Erro BMS      | Raw 32-bits      |
+| **4**     | Voltagem Pior Célula   | (V - 2.0) * 100  |
+| **5**     | Tensão Melhor Célula   | (V - 2.0) * 100  |
+| **6**     | Média Geral            | (V - 2.0) * 100  |
+| **7**     | SOC Direto             | % Direta (0-100) |
+
+#### 3️⃣ Tensões Individuais das Células - `IDs 0x15438081 a 0x15478081`
+| ID             | Células Mapeadas | Escala          |
+|----------------|------------------|-----------------|
+| **0x15438081** | 1 a 8            | (V - 2.0) * 100 |
+| **0x15448081** | 9 a 16           | (V - 2.0) * 100 |
+| **0x15458081** | 17 a 24          | (V - 2.0) * 100 |
+| **0x15468081** | 25 a 32          | (V - 2.0) * 100 |
+| **0x15478081** | 33 a 40          | (V - 2.0) * 100 |
 
 ---
 
@@ -79,7 +89,7 @@ Caso passe-se mais um limite programado rígido de **3000ms (3 segundos)** atrav
 
 Ele manda para o FDCAN2 as instruções:
 - **ID de Pânico**: `0x0D428081`
-- **Payload**: Byte zero constando `0x01` como Código oficial da Perda de Comunicação BMS.
+- **Payload**: Byte zero constando `0x01` como Código oficial da Perda de Comunicação BMS. (Definido como `ERROR_CODE_BMS_LOST`).
 
 Isso previne que dispositivos dependentes da medição da bateria prossigam com a carga ou aceleração.
 

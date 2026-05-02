@@ -1,4 +1,4 @@
 ../Core/Src/can.c:26:6:CAN_Transmit	80	static
-../Core/Src/can.c:60:6:CAN_ProcessBMSMessage	48	static
-../Core/Src/can.c:104:6:CAN_SimulateBMS	48	static
-../Core/Src/can.c:127:6:CAN_TransmitTelemetry	64	static
+../Core/Src/can.c:68:6:CAN_ProcessBMSMessage	48	static
+../Core/Src/can.c:112:6:CAN_SimulateBMS	48	static
+../Core/Src/can.c:135:6:CAN_TransmitTelemetry	64	static

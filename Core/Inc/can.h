@@ -65,6 +65,8 @@ typedef struct {
     float cellVoltages[40]; 
 } EMUS_BMS_Data_t;
 
+extern EMUS_BMS_Data_t emusBmsData;
+
 /* ==================== Prototypes ===================================== */
 
 void CAN_Transmit(FDCAN_HandleTypeDef *hfdcan, uint32_t id, uint8_t *data, uint32_t len, uint32_t idType);

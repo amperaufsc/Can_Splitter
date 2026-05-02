@@ -19,6 +19,8 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
+/* Private includes ----------------------------------------------------------*/
+/* USER CODE BEGIN Includes */
 #include <stdbool.h>
 #include "can.h"
 /* USER CODE END Includes */
@@ -57,6 +59,7 @@ uint8_t FDCAN2RxData[8];
 uint8_t FDCAN2TxData[8];
 
 bool bmsTimeoutLoopbackFlag = false;
+
 
 /* USER CODE END PV */
 
@@ -175,7 +178,7 @@ void SystemClock_Config(void)
   * @param None
   * @retval None
   */
-static void MX_FDCAN1_Init(void) // EMUS BMS CAN
+static void MX_FDCAN1_Init(void)
 {
 
   /* USER CODE BEGIN FDCAN1_Init 0 */
@@ -188,11 +191,7 @@ static void MX_FDCAN1_Init(void) // EMUS BMS CAN
   hfdcan1.Instance = FDCAN1;
   hfdcan1.Init.ClockDivider = FDCAN_CLOCK_DIV1;
   hfdcan1.Init.FrameFormat = FDCAN_FRAME_CLASSIC;
-#ifdef testLoopbackCAN1
-  hfdcan1.Init.Mode = FDCAN_MODE_INTERNAL_LOOPBACK;
-#else
-  hfdcan1.Init.Mode = FDCAN_MODE_NORMAL;
-#endif
+  hfdcan1.Init.Mode = FDCAN_MODE_EXTERNAL_LOOPBACK;
   hfdcan1.Init.AutoRetransmission = DISABLE;
   hfdcan1.Init.TransmitPause = DISABLE;
   hfdcan1.Init.ProtocolException = DISABLE;
@@ -254,7 +253,7 @@ static void MX_FDCAN1_Init(void) // EMUS BMS CAN
   * @param None
   * @retval None
   */
-static void MX_FDCAN2_Init(void) // GENERAL CAN
+static void MX_FDCAN2_Init(void)
 {
 
   /* USER CODE BEGIN FDCAN2_Init 0 */
@@ -267,11 +266,7 @@ static void MX_FDCAN2_Init(void) // GENERAL CAN
   hfdcan2.Instance = FDCAN2;
   hfdcan2.Init.ClockDivider = FDCAN_CLOCK_DIV1;
   hfdcan2.Init.FrameFormat = FDCAN_FRAME_CLASSIC;
-#ifdef testLoopbackCAN2
-  hfdcan2.Init.Mode = FDCAN_MODE_INTERNAL_LOOPBACK;
-#else
-  hfdcan2.Init.Mode = FDCAN_MODE_NORMAL;
-#endif
+  hfdcan2.Init.Mode = FDCAN_MODE_EXTERNAL_LOOPBACK;
   hfdcan2.Init.AutoRetransmission = DISABLE;
   hfdcan2.Init.TransmitPause = DISABLE;
   hfdcan2.Init.ProtocolException = DISABLE;
@@ -435,7 +430,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 		HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_8);
 
 		// --- Lógica de Tradução e Envio de Telemetria (CAN2) ---
-		CAN_TransmitTelemetry(); 
+		CAN_TransmitTelemetry();
 	}
 }
 /* USER CODE END 4 */
