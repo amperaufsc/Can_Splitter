@@ -1,4 +1,4 @@
 ../Core/Src/can.c:26:6:CAN_Transmit	12
-../Core/Src/can.c:68:6:CAN_ProcessBMSMessage	9
-../Core/Src/can.c:112:6:CAN_SimulateBMS	9
-../Core/Src/can.c:135:6:CAN_TransmitTelemetry	4
+../Core/Src/can.c:68:6:CAN_ProcessBMSMessage	10
+../Core/Src/can.c:116:6:CAN_SimulateBMS	10
+../Core/Src/can.c:143:6:CAN_TransmitTelemetry	4

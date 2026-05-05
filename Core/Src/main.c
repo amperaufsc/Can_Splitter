@@ -192,7 +192,7 @@ static void MX_FDCAN1_Init(void)
   hfdcan1.Init.ClockDivider = FDCAN_CLOCK_DIV1;
   hfdcan1.Init.FrameFormat = FDCAN_FRAME_CLASSIC;
 #ifdef testLoopbackCAN1
-  hfdcan1.Init.Mode = FDCAN_MODE_EXTERNAL_LOOPBACK;
+  hfdcan1.Init.Mode = FDCAN_MODE_INTERNAL_LOOPBACK;
 #else
   hfdcan1.Init.Mode = FDCAN_MODE_NORMAL;
 #endif
@@ -271,7 +271,7 @@ static void MX_FDCAN2_Init(void)
   hfdcan2.Init.ClockDivider = FDCAN_CLOCK_DIV1;
   hfdcan2.Init.FrameFormat = FDCAN_FRAME_CLASSIC;
 #ifdef testLoopbackCAN2
-  hfdcan2.Init.Mode = FDCAN_MODE_EXTERNAL_LOOPBACK;
+  hfdcan2.Init.Mode = FDCAN_MODE_INTERNAL_LOOPBACK;
 #else
   hfdcan2.Init.Mode = FDCAN_MODE_NORMAL;
 #endif
@@ -450,7 +450,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, RESET);
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, SET);
   /* User can add his own implementation to report the HAL error return state */
   __disable_irq();
   while (1)

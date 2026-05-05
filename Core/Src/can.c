@@ -95,12 +95,16 @@ void CAN_ProcessBMSMessage(uint32_t id, uint8_t *data, uint8_t dlc) {
         emusBmsData.totalVoltage = rawV * 0.01f;
     } 
     else if (cleanId == CAN_ID_BMS_SOC) {
-        uint16_t rawCurrent = (uint16_t)((data[0] << 8) | data[1]);
-        emusBmsData.current = (float)((int16_t)rawCurrent) * 0.1f;
+        // Corrente agora lida exclusivamente via Sensor Externo (ID 0x521)
         emusBmsData.soc = data[6];
     }
     else if (cleanId == CAN_ID_BMS_DIAGNOSTICS) {
         emusBmsData.protectionFlags = (uint32_t)((data[0] << 24) | (data[1] << 16) | (data[2] << 8) | data[3]);
+    }
+    else if (cleanId == CAN_ID_SENSOR_CURRENT) {
+        // Sensor Externo: MSB no byte 5, LSB no byte 2. Escala 0.001A (1mA/bit)
+        int32_t rawCurrent = (int32_t)((data[5] << 24) | (data[4] << 16) | (data[3] << 8) | data[2]);
+        emusBmsData.current = (float)rawCurrent * 0.001f;
     }
 
     emusBmsData.lastUpdateTick = HAL_GetTick();
@@ -111,10 +115,12 @@ void CAN_ProcessBMSMessage(uint32_t id, uint8_t *data, uint8_t dlc) {
  */
 void CAN_SimulateBMS(void) {
     static uint8_t simStep = 0;
+    static uint8_t tracker = 0;
     uint8_t dummy01[8] = {160, 160, 160, 0x38, 0x40, 0x00, 0x00, 0x00};
     uint8_t dummy05[8] = {0x01, 0xF4, 0x00, 0x00, 0x00, 0x00, 80, 0x00};
     uint8_t dummy07[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
     uint8_t dummyCell[8] = {160, 160, 160, 160, 160, 160, 160, 160};
+    uint8_t dummySensor[8] = {0x00, tracker, 0x56, 0x08, 0x01, 0x00, 0x00, 0x00}; // 67.67A (67670 mA)
 
     switch (simStep) {
         case 0: CAN_Transmit(&hfdcan1, CAN_ID_BMS_OVERALL_PARAMS, dummy01, 8, FDCAN_STANDARD_ID); break;
@@ -125,8 +131,10 @@ void CAN_SimulateBMS(void) {
         case 5: CAN_Transmit(&hfdcan1, CAN_ID_BMS_CELL_VOLT_START + 2, dummyCell, 8, FDCAN_STANDARD_ID); break;
         case 6: CAN_Transmit(&hfdcan1, CAN_ID_BMS_CELL_VOLT_START + 3, dummyCell, 8, FDCAN_STANDARD_ID); break;
         case 7: CAN_Transmit(&hfdcan1, CAN_ID_BMS_CELL_VOLT_START + 4, dummyCell, 8, FDCAN_STANDARD_ID); break;
+        case 8: CAN_Transmit(&hfdcan1, CAN_ID_SENSOR_CURRENT, dummySensor, 6, FDCAN_STANDARD_ID); break;
     }
-    simStep = (simStep + 1) % 8;
+    simStep = (simStep + 1) % 9;
+    tracker = (tracker + 1) % 0x10;
 }
 
 /**
