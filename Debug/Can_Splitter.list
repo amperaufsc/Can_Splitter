@@ -1809,8 +1809,8 @@ void Error_Handler(void)
  8000da4:	b580      	push	{r7, lr}
  8000da6:	af00      	add	r7, sp, #0
   /* USER CODE BEGIN Error_Handler_Debug */
-	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, RESET);
- 8000da8:	2200      	movs	r2, #0
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, SET);
+ 8000da8:	2201      	movs	r2, #1
  8000daa:	f44f 7180 	mov.w	r1, #256	@ 0x100
  8000dae:	4803      	ldr	r0, [pc, #12]	@ (8000dbc <Error_Handler+0x18>)
  8000db0:	f001 fb80 	bl	80024b4 <HAL_GPIO_WritePin>
