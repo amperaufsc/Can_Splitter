@@ -11,8 +11,8 @@
 /* ==================== Configuração de Teste ========================== */
 
 /** @brief Ativa a simulação interna da BMS (Envio de frames 0x01, 0x05, 0x07 no CAN1) */
-#define testLoopbackCAN1
-#define testLoopbackCAN2
+//#define testLoopbackCAN1
+//#define testLoopbackCAN2
 /* ==================== Defines de Sistema ============================= */
 
 /** @brief Maximum retries for adding message to TX FIFO */
@@ -40,7 +40,7 @@
 
 /** @brief Error/Timeout IDs */
 #define CAN_ID_BMS_TIMEOUT  0x0D428081
-#define ERROR_CODE_BMS_LOST 1<<0
+#define ERROR_CODE_BMS_LOST (1u << 0)
 
 /* ==================== Types ========================================== */
 
@@ -67,10 +67,11 @@ typedef struct {
 } EMUS_BMS_Data_t;
 
 extern EMUS_BMS_Data_t emusBmsData;
+extern volatile uint8_t txTelemetryRequest;
 
 /* ==================== Prototypes ===================================== */
 
-void CAN_Transmit(FDCAN_HandleTypeDef *hfdcan, uint32_t id, uint8_t *data, uint32_t len, uint32_t idType);
+CAN_TxStatus_t CAN_Transmit(FDCAN_HandleTypeDef *hfdcan, uint32_t id, uint8_t *data, uint32_t len, uint32_t idType);
 void CAN_ProcessBMSMessage(uint32_t id, uint8_t *data, uint8_t dlc);
 void CAN_SimulateBMS(void);
 void CAN_TransmitTelemetry(void);

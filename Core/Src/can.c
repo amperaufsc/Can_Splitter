@@ -12,18 +12,28 @@ extern FDCAN_HandleTypeDef hfdcan2;
 
 /* ==================== Global State =================================== */
 EMUS_BMS_Data_t emusBmsData = {0};
+volatile uint8_t txTelemetryRequest = 0;
 
 // Variável de debug
 uint32_t cellMsgCount = 0;
 
 static uint32_t canConsecutiveFailures = 0;
 
+/* Cell voltage encoding: byte = (V - 2.0) * 100, clamped to valid uint8 range. */
+static inline uint8_t voltage_to_byte(float v) {
+    if (v < 2.0f)  return 0;
+    if (v > 4.55f) return 255;
+    return (uint8_t)((v - 2.0f) * 100.0f);
+}
+
 /* ==================== Core Functions ================================= */
 
 /**
  * @brief Transmits a CAN frame with a simple retry mechanism.
+ * @retval CAN_TX_OK on success, CAN_TX_FAIL after retry exhaustion,
+ *         CAN_TX_FATAL after CAN_TX_FAULT_THRESHOLD consecutive failures.
  */
-void CAN_Transmit(FDCAN_HandleTypeDef *hfdcan, uint32_t id, uint8_t *data, uint32_t len, uint32_t idType) {
+CAN_TxStatus_t CAN_Transmit(FDCAN_HandleTypeDef *hfdcan, uint32_t id, uint8_t *data, uint32_t len, uint32_t idType) {
     FDCAN_TxHeaderTypeDef TxHeader;
     FDCAN_TxHeaderTypeDef *pHeader = &TxHeader;
     uint8_t pData[8] = {0};
@@ -36,7 +46,7 @@ void CAN_Transmit(FDCAN_HandleTypeDef *hfdcan, uint32_t id, uint8_t *data, uint3
     pHeader->FDFormat = FDCAN_CLASSIC_CAN;
     pHeader->TxEventFifoControl = FDCAN_NO_TX_EVENTS;
     pHeader->MessageMarker = 0;
-    
+
     switch (len) {
         case 0: pHeader->DataLength = FDCAN_DLC_BYTES_0; break;
         case 1: pHeader->DataLength = FDCAN_DLC_BYTES_1; break;
@@ -53,13 +63,14 @@ void CAN_Transmit(FDCAN_HandleTypeDef *hfdcan, uint32_t id, uint8_t *data, uint3
 
     uint32_t retry = 0;
     while (HAL_FDCAN_AddMessageToTxFifoQ(hfdcan, pHeader, pData) != HAL_OK) {
-        for(volatile int i=0; i<200; i++); 
+        for(volatile int i=0; i<200; i++);
         if (++retry >= CAN_TX_RETRY_MAX) {
             canConsecutiveFailures++;
-            return;
+            return (canConsecutiveFailures >= CAN_TX_FAULT_THRESHOLD) ? CAN_TX_FATAL : CAN_TX_FAIL;
         }
     }
     canConsecutiveFailures = 0;
+    return CAN_TX_OK;
 }
 
 /**
@@ -96,7 +107,9 @@ void CAN_ProcessBMSMessage(uint32_t id, uint8_t *data, uint8_t dlc) {
     } 
     else if (cleanId == CAN_ID_BMS_SOC) {
         // Corrente agora lida exclusivamente via Sensor Externo (ID 0x521)
-        emusBmsData.soc = data[6];
+        // Clamp: BMS pode reportar 0xFF como "inválido"; força 0 para que derating de jusante atue.
+        uint8_t rawSoc = data[6];
+        emusBmsData.soc = (rawSoc <= 100) ? rawSoc : 0;
     }
     else if (cleanId == CAN_ID_BMS_DIAGNOSTICS) {
         emusBmsData.protectionFlags = (uint32_t)((data[0] << 24) | (data[1] << 16) | (data[2] << 8) | data[3]);
@@ -139,6 +152,8 @@ void CAN_SimulateBMS(void) {
 
 /**
  * @brief Consolidates and transmits processed BMS data to vehicle bus (CAN2).
+ *        Should be called from main loop (not ISR) — retry busy-wait would
+ *        otherwise starve FDCAN1 RX.
  */
 void CAN_TransmitTelemetry(void) {
     uint8_t txDataBuffer[8];
@@ -147,32 +162,43 @@ void CAN_TransmitTelemetry(void) {
     CAN_SimulateBMS();
 #endif
 
-    if ((HAL_GetTick() - emusBmsData.lastUpdateTick) > 3000) {
+    /* Boot guard: lastUpdateTick == 0 means we never received a BMS frame yet,
+     * so treat as timeout and skip TX of stale zeros. */
+    if (emusBmsData.lastUpdateTick == 0 ||
+        (HAL_GetTick() - emusBmsData.lastUpdateTick) > 3000) {
         memset(txDataBuffer, 0, 8);
         txDataBuffer[0] = ERROR_CODE_BMS_LOST;
-        CAN_Transmit(&hfdcan2, CAN_ID_BMS_TIMEOUT, txDataBuffer, 8, FDCAN_EXTENDED_ID);
+        if (CAN_Transmit(&hfdcan2, CAN_ID_BMS_TIMEOUT, txDataBuffer, 8, FDCAN_EXTENDED_ID) == CAN_TX_FATAL) {
+            Error_Handler();
+        }
         return;
     }
 
     // 1. ID Telemetria 1 (Voltagem e Corrente)
     memcpy(&txDataBuffer[0], &emusBmsData.totalVoltage, 4);
     memcpy(&txDataBuffer[4], &emusBmsData.current, 4);
-    CAN_Transmit(&hfdcan2, CANSplitterID1, txDataBuffer, 8, FDCAN_EXTENDED_ID);
+    if (CAN_Transmit(&hfdcan2, CANSplitterID1, txDataBuffer, 8, FDCAN_EXTENDED_ID) == CAN_TX_FATAL) {
+        Error_Handler();
+    }
 
     // 2. ID Telemetria 2 (Stats e SOC)
     memcpy(&txDataBuffer[0], &emusBmsData.protectionFlags, 4);
-    txDataBuffer[4] = (uint8_t)((emusBmsData.minCellVoltage - 2.00f) * 100.0f);
-    txDataBuffer[5] = (uint8_t)((emusBmsData.maxCellVoltage - 2.00f) * 100.0f);
-    txDataBuffer[6] = (uint8_t)((emusBmsData.avgCellVoltage - 2.00f) * 100.0f);
+    txDataBuffer[4] = voltage_to_byte(emusBmsData.minCellVoltage);
+    txDataBuffer[5] = voltage_to_byte(emusBmsData.maxCellVoltage);
+    txDataBuffer[6] = voltage_to_byte(emusBmsData.avgCellVoltage);
     txDataBuffer[7] = emusBmsData.soc;
-    CAN_Transmit(&hfdcan2, CANSplitterID2, txDataBuffer, 8, FDCAN_EXTENDED_ID);
+    if (CAN_Transmit(&hfdcan2, CANSplitterID2, txDataBuffer, 8, FDCAN_EXTENDED_ID) == CAN_TX_FATAL) {
+        Error_Handler();
+    }
 
     // 3. Telemetria Células (CAN2)
     uint32_t cellIDs[5] = {CANSplitterID4, CANSplitterID5, CANSplitterID6, CANSplitterID7, CANSplitterID8};
     for (uint8_t group = 0; group < 5; group++) {
         for (uint8_t i = 0; i < 8; i++) {
-            txDataBuffer[i] = (uint8_t)((emusBmsData.cellVoltages[group * 8 + i] - 2.00f) * 100.0f);
+            txDataBuffer[i] = voltage_to_byte(emusBmsData.cellVoltages[group * 8 + i]);
         }
-        CAN_Transmit(&hfdcan2, cellIDs[group], txDataBuffer, 8, FDCAN_EXTENDED_ID);
+        if (CAN_Transmit(&hfdcan2, cellIDs[group], txDataBuffer, 8, FDCAN_EXTENDED_ID) == CAN_TX_FATAL) {
+            Error_Handler();
+        }
     }
 }

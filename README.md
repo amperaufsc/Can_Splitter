@@ -25,7 +25,7 @@ O Microcontrolador tira proveito de dois periféricos FDCAN independentes para i
 
   (A) Mensagens BMS: 0x01, 0x05, 0x07, 0x20-0x3F
   (B) Telemetria Principal: 0x15408081, 0x15418081 (e Panic ID 0x0D428081)
-  (C) Telemetria Células: 0x15438081 a 0x15478081
+  (C) Telemetria Células: 0x15438281 a 0x15478281
 ```
 
 ---
@@ -60,14 +60,14 @@ Apoiado na interrupção do **Timer 1 (`TIM1`)**, o pacote consolidado do Splitt
 | **6**     | Média Geral            | (V - 2.0) * 100  |
 | **7**     | SOC Direto             | % Direta (0-100) |
 
-#### 3️⃣ Tensões Individuais das Células - `IDs 0x15438081 a 0x15478081`
+#### 3️⃣ Tensões Individuais das Células - `IDs 0x15438281 a 0x15478281`
 | ID             | Células Mapeadas | Escala          |
 |----------------|------------------|-----------------|
-| **0x15438081** | 1 a 8            | (V - 2.0) * 100 |
-| **0x15448081** | 9 a 16           | (V - 2.0) * 100 |
-| **0x15458081** | 17 a 24          | (V - 2.0) * 100 |
-| **0x15468081** | 25 a 32          | (V - 2.0) * 100 |
-| **0x15478081** | 33 a 40          | (V - 2.0) * 100 |
+| **0x15438281** | 1 a 8            | (V - 2.0) * 100 |
+| **0x15448281** | 9 a 16           | (V - 2.0) * 100 |
+| **0x15458281** | 17 a 24          | (V - 2.0) * 100 |
+| **0x15468281** | 25 a 32          | (V - 2.0) * 100 |
+| **0x15478281** | 33 a 40          | (V - 2.0) * 100 |
 
 ---
 

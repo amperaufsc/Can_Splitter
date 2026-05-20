@@ -2,12 +2,12 @@
 CAD.formats=
 CAD.pinconfig=
 CAD.provider=
-FDCAN1.CalculateBaudRateNominal=499999
-FDCAN1.CalculateTimeBitNominal=2000
-FDCAN1.CalculateTimeQuantumNominal=58.82352941176471
+FDCAN1.CalculateBaudRateNominal=249999
+FDCAN1.CalculateTimeBitNominal=4000
+FDCAN1.CalculateTimeQuantumNominal=117.64705882352941
 FDCAN1.ExtFiltersNbr=0
 FDCAN1.IPParameters=CalculateTimeQuantumNominal,CalculateTimeBitNominal,CalculateBaudRateNominal,NominalPrescaler,NominalTimeSeg1,NominalTimeSeg2,ExtFiltersNbr,StdFiltersNbr
-FDCAN1.NominalPrescaler=10
+FDCAN1.NominalPrescaler=20
 FDCAN1.NominalTimeSeg1=26
 FDCAN1.NominalTimeSeg2=7
 FDCAN1.StdFiltersNbr=1

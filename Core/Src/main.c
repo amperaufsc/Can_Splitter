@@ -120,6 +120,10 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    if (txTelemetryRequest) {
+      txTelemetryRequest = 0;
+      CAN_TransmitTelemetry();
+    }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -199,7 +203,7 @@ static void MX_FDCAN1_Init(void)
   hfdcan1.Init.AutoRetransmission = DISABLE;
   hfdcan1.Init.TransmitPause = DISABLE;
   hfdcan1.Init.ProtocolException = DISABLE;
-  hfdcan1.Init.NominalPrescaler = 10;
+  hfdcan1.Init.NominalPrescaler = 20;
   hfdcan1.Init.NominalSyncJumpWidth = 1;
   hfdcan1.Init.NominalTimeSeg1 = 26;
   hfdcan1.Init.NominalTimeSeg2 = 7;
@@ -409,6 +413,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 				uint8_t dlc = FDCAN1RxHeader.DataLength;
 				// Processa a mensagem do BMS para telemetria estruturada
 				CAN_ProcessBMSMessage(FDCAN1RxHeader.Identifier, FDCAN1RxData, dlc);
+				HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_8);
 			}
 		}
 	}
@@ -435,10 +440,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 
 	if (htim->Instance == TIM1) {
 		// Toggle Debug LED
-		HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_8);
+//		HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_8);
 
-		// --- Lógica de Tradução e Envio de Telemetria (CAN2) ---
-		CAN_TransmitTelemetry();
+		/* Defer TX to main loop — retry busy-wait must not run in ISR context,
+		 * otherwise FDCAN1 RX (same prio) starves and BMS frames are lost. */
+		txTelemetryRequest = 1;
 	}
 }
 /* USER CODE END 4 */
