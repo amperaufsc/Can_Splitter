@@ -18,11 +18,11 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include <string.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdbool.h>
+#include "can.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -44,12 +44,22 @@
 FDCAN_HandleTypeDef hfdcan1;
 FDCAN_HandleTypeDef hfdcan2;
 
+TIM_HandleTypeDef htim1;
+
 /* USER CODE BEGIN PV */
 
-FDCAN_RxHeaderTypeDef RxHeader;
-FDCAN_TxHeaderTypeDef TxHeader;
-uint8_t RxData[8];
-uint8_t TxData[8];
+FDCAN_RxHeaderTypeDef FDCAN1RxHeader;
+FDCAN_TxHeaderTypeDef FDCAN1TxHeader;
+uint8_t FDCAN1RxData[8];
+uint8_t FDCAN1TxData[8];
+
+FDCAN_RxHeaderTypeDef FDCAN2RxHeader;
+FDCAN_TxHeaderTypeDef FDCAN2TxHeader;
+uint8_t FDCAN2RxData[8];
+uint8_t FDCAN2TxData[8];
+
+bool bmsTimeoutLoopbackFlag = false;
+
 
 /* USER CODE END PV */
 
@@ -58,8 +68,11 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_FDCAN1_Init(void);
 static void MX_FDCAN2_Init(void);
+static void MX_TIM1_Init(void);
 /* USER CODE BEGIN PFP */
-
+void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs);
+void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs);
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -98,73 +111,19 @@ int main(void)
   MX_GPIO_Init();
   MX_FDCAN1_Init();
   MX_FDCAN2_Init();
+  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
-
-  FDCAN_FilterTypeDef sFilterConfig;
-
-  sFilterConfig.IdType = FDCAN_EXTENDED_ID;
-  sFilterConfig.FilterIndex = 0;
-  sFilterConfig.FilterType = FDCAN_FILTER_MASK;
-  sFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
-  sFilterConfig.FilterID1 = 0x00000000;
-  sFilterConfig.FilterID2 = 0x00000000;
-
-
-  if (HAL_FDCAN_ConfigFilter(&hfdcan1, &sFilterConfig) != HAL_OK) { Error_Handler(); }
-
-
-  if (HAL_FDCAN_ConfigFilter(&hfdcan2, &sFilterConfig) != HAL_OK) { Error_Handler(); }
-
-
-  HAL_FDCAN_ConfigGlobalFilter(&hfdcan1, FDCAN_REJECT, FDCAN_REJECT, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE);
-  HAL_FDCAN_ConfigGlobalFilter(&hfdcan2, FDCAN_REJECT, FDCAN_REJECT, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE);
-
-
-  if (HAL_FDCAN_Start(&hfdcan1) != HAL_OK) { Error_Handler(); }
-  if (HAL_FDCAN_Start(&hfdcan2) != HAL_OK) { Error_Handler(); }
-
-
-  if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK) { Error_Handler(); }
-  if (HAL_FDCAN_ActivateNotification(&hfdcan2, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK) { Error_Handler(); }
-
-
-//Teste Loopback
-
-    TxHeader.Identifier = 0x00000001;
-    TxHeader.IdType = FDCAN_EXTENDED_ID;
-    TxHeader.TxFrameType = FDCAN_DATA_FRAME;
-    TxHeader.DataLength = FDCAN_DLC_BYTES_8;
-    TxHeader.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
-    TxHeader.BitRateSwitch = FDCAN_BRS_OFF;
-    TxHeader.FDFormat = FDCAN_CLASSIC_CAN;
-    TxHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
-    TxHeader.MessageMarker = 0;
-
-
-    TxData[0] = 0x11;
-    TxData[1] = 0x22;
-    TxData[2] = 0x33;
-    TxData[3] = 0x44;
-    TxData[4] = 0x55;
-    TxData[5] = 0x66;
-    TxData[6] = 0x77;
-    TxData[7] = 0x88;
-
-    HAL_FDCAN_AddMessageToTxBuffer(&hfdcan1, &TxHeader, TxData, FDCAN_TX_BUFFER0);
-    HAL_FDCAN_EnableTxBufferRequest(&hfdcan1, FDCAN_TX_BUFFER0);
-
-    /* USER CODE END 2 */
-
-    while (1)
-    {
-        // ...
-
+  HAL_TIM_Base_Start_IT(&htim1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    if (txTelemetryRequest) {
+      txTelemetryRequest = 0;
+      CAN_TransmitTelemetry();
+    }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -183,7 +142,7 @@ void SystemClock_Config(void)
 
   /** Configure the main internal regulator output voltage
   */
-  HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1);
+  HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1_BOOST);
 
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
@@ -191,7 +150,13 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+  RCC_OscInitStruct.PLL.PLLM = RCC_PLLM_DIV4;
+  RCC_OscInitStruct.PLL.PLLN = 85;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
+  RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -201,12 +166,12 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK)
   {
     Error_Handler();
   }
@@ -230,27 +195,62 @@ static void MX_FDCAN1_Init(void)
   hfdcan1.Instance = FDCAN1;
   hfdcan1.Init.ClockDivider = FDCAN_CLOCK_DIV1;
   hfdcan1.Init.FrameFormat = FDCAN_FRAME_CLASSIC;
-//hfdcan1.Init.Mode = FDCAN_MODE_NORMAL;
+#ifdef testLoopbackCAN1
   hfdcan1.Init.Mode = FDCAN_MODE_INTERNAL_LOOPBACK;
+#else
+  hfdcan1.Init.Mode = FDCAN_MODE_NORMAL;
+#endif
   hfdcan1.Init.AutoRetransmission = DISABLE;
   hfdcan1.Init.TransmitPause = DISABLE;
   hfdcan1.Init.ProtocolException = DISABLE;
-  hfdcan1.Init.NominalPrescaler = 8;
+  hfdcan1.Init.NominalPrescaler = 20;
   hfdcan1.Init.NominalSyncJumpWidth = 1;
-  hfdcan1.Init.NominalTimeSeg1 = 2;
-  hfdcan1.Init.NominalTimeSeg2 = 1;
+  hfdcan1.Init.NominalTimeSeg1 = 26;
+  hfdcan1.Init.NominalTimeSeg2 = 7;
   hfdcan1.Init.DataPrescaler = 1;
   hfdcan1.Init.DataSyncJumpWidth = 1;
   hfdcan1.Init.DataTimeSeg1 = 1;
   hfdcan1.Init.DataTimeSeg2 = 1;
-  hfdcan1.Init.StdFiltersNbr = 0;
-  hfdcan1.Init.ExtFiltersNbr = 1;
+  hfdcan1.Init.StdFiltersNbr = 1;
+  hfdcan1.Init.ExtFiltersNbr = 0;
   hfdcan1.Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
   if (HAL_FDCAN_Init(&hfdcan1) != HAL_OK)
   {
     Error_Handler();
   }
   /* USER CODE BEGIN FDCAN1_Init 2 */
+  FDCAN_FilterTypeDef sFilterConfig;
+
+  sFilterConfig.IdType = FDCAN_STANDARD_ID;
+  sFilterConfig.FilterIndex = 0;
+  sFilterConfig.FilterType = FDCAN_FILTER_RANGE;
+  sFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
+  sFilterConfig.FilterID1 = 0x000;
+  sFilterConfig.FilterID2 = 0x7FF;
+
+  if (HAL_FDCAN_ConfigFilter(&hfdcan1, &sFilterConfig) != HAL_OK) {
+	  Error_Handler();
+  }
+
+  HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0);
+  HAL_FDCAN_Start(&hfdcan1);
+
+#ifdef testLoopbackCAN1
+  FDCAN1TxHeader.FDFormat = FDCAN_CLASSIC_CAN;
+  FDCAN1TxHeader.IdType = FDCAN_STANDARD_ID;
+  FDCAN1TxHeader.BitRateSwitch = FDCAN_BRS_OFF;
+  FDCAN1TxHeader.TxFrameType = FDCAN_DATA_FRAME;
+  FDCAN1TxHeader.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
+  FDCAN1TxHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
+  FDCAN1TxHeader.MessageMarker = 0;
+#else
+  FDCAN1TxHeader.FDFormat = FDCAN_CLASSIC_CAN;
+  FDCAN1TxHeader.BitRateSwitch = FDCAN_BRS_OFF;
+  FDCAN1TxHeader.TxFrameType = FDCAN_DATA_FRAME;
+  FDCAN1TxHeader.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
+  FDCAN1TxHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
+  FDCAN1TxHeader.MessageMarker = 0;
+#endif
 
   /* USER CODE END FDCAN1_Init 2 */
 
@@ -274,15 +274,18 @@ static void MX_FDCAN2_Init(void)
   hfdcan2.Instance = FDCAN2;
   hfdcan2.Init.ClockDivider = FDCAN_CLOCK_DIV1;
   hfdcan2.Init.FrameFormat = FDCAN_FRAME_CLASSIC;
-//hfdcan2.Init.Mode = FDCAN_MODE_NORMAL;
+#ifdef testLoopbackCAN2
   hfdcan2.Init.Mode = FDCAN_MODE_INTERNAL_LOOPBACK;
+#else
+  hfdcan2.Init.Mode = FDCAN_MODE_NORMAL;
+#endif
   hfdcan2.Init.AutoRetransmission = DISABLE;
   hfdcan2.Init.TransmitPause = DISABLE;
   hfdcan2.Init.ProtocolException = DISABLE;
-  hfdcan2.Init.NominalPrescaler = 8;
+  hfdcan2.Init.NominalPrescaler = 10;
   hfdcan2.Init.NominalSyncJumpWidth = 1;
-  hfdcan2.Init.NominalTimeSeg1 = 2;
-  hfdcan2.Init.NominalTimeSeg2 = 1;
+  hfdcan2.Init.NominalTimeSeg1 = 26;
+  hfdcan2.Init.NominalTimeSeg2 = 7;
   hfdcan2.Init.DataPrescaler = 1;
   hfdcan2.Init.DataSyncJumpWidth = 1;
   hfdcan2.Init.DataTimeSeg1 = 1;
@@ -295,8 +298,78 @@ static void MX_FDCAN2_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN FDCAN2_Init 2 */
+  FDCAN_FilterTypeDef sFilterConfig2;
 
+  sFilterConfig2.IdType = FDCAN_EXTENDED_ID;
+  sFilterConfig2.FilterIndex = 0;
+  sFilterConfig2.FilterType = FDCAN_FILTER_MASK;
+  sFilterConfig2.FilterConfig = FDCAN_FILTER_TO_RXFIFO1;
+  sFilterConfig2.FilterID1 = 0;
+  sFilterConfig2.FilterID2 = 0;
+
+  if (HAL_FDCAN_ConfigFilter(&hfdcan2, &sFilterConfig2) != HAL_OK) {
+	  Error_Handler();
+  }
+
+  HAL_FDCAN_ActivateNotification(&hfdcan2, FDCAN_IT_RX_FIFO1_NEW_MESSAGE, 0);
+
+  HAL_FDCAN_Start(&hfdcan2);
+
+  FDCAN2TxHeader.FDFormat = FDCAN_CLASSIC_CAN;
+  FDCAN2TxHeader.IdType = FDCAN_EXTENDED_ID;
+  FDCAN2TxHeader.BitRateSwitch = FDCAN_BRS_OFF;
+  FDCAN2TxHeader.TxFrameType = FDCAN_DATA_FRAME;
+  FDCAN2TxHeader.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
+  FDCAN2TxHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
+  FDCAN2TxHeader.MessageMarker = 0;
   /* USER CODE END FDCAN2_Init 2 */
+
+}
+
+/**
+  * @brief TIM1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM1_Init(void)
+{
+
+  /* USER CODE BEGIN TIM1_Init 0 */
+
+  /* USER CODE END TIM1_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM1_Init 1 */
+
+  /* USER CODE END TIM1_Init 1 */
+  htim1.Instance = TIM1;
+  htim1.Init.Prescaler = 16999;
+  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim1.Init.Period = 999;
+  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim1.Init.RepetitionCounter = 0;
+  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterOutputTrigger2 = TIM_TRGO2_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM1_Init 2 */
+
+  /* USER CODE END TIM1_Init 2 */
 
 }
 
@@ -307,12 +380,24 @@ static void MX_FDCAN2_Init(void)
   */
 static void MX_GPIO_Init(void)
 {
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
 /* USER CODE BEGIN MX_GPIO_Init_1 */
 /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : PC8 */
+  GPIO_InitStruct.Pin = GPIO_PIN_8;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
@@ -320,114 +405,47 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
-{
-    if((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != RESET)
-    {
-        if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &RxHeader, RxData) == HAL_OK)
-        {
+void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs) {
+	if (hfdcan->Instance == FDCAN1) {
+		if ((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != RESET) {
+			/* Retrieve message from hardware FIFO */
+			if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &FDCAN1RxHeader, FDCAN1RxData) == HAL_OK) {
+				uint8_t dlc = FDCAN1RxHeader.DataLength;
+				// Processa a mensagem do BMS para telemetria estruturada
+				CAN_ProcessBMSMessage(FDCAN1RxHeader.Identifier, FDCAN1RxData, dlc);
+				HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_8);
+			}
+		}
+	}
+}
 
-            TxHeader.IdType = FDCAN_EXTENDED_ID;
-            TxHeader.TxFrameType = FDCAN_DATA_FRAME;
-            TxHeader.DataLength = FDCAN_DLC_BYTES_8;
-            TxHeader.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
-            TxHeader.BitRateSwitch = FDCAN_BRS_OFF;
-            TxHeader.FDFormat = FDCAN_CLASSIC_CAN;
-            TxHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
-            TxHeader.MessageMarker = 0;
+void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs) {
+#ifdef testLoopbackCAN2
+	if (hfdcan->Instance == FDCAN2) {
+		if ((RxFifo1ITs & FDCAN_IT_RX_FIFO1_NEW_MESSAGE) != RESET) {
+			/* Receive message back for loopback verification */
+			HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO1, &FDCAN2RxHeader, FDCAN2RxData);
+			
+			if (FDCAN2RxHeader.Identifier == 0x0D428081) {
+				if (FDCAN2RxData[0] == 0x01) { // ERROR_CODE_BMS_LOST
+					bmsTimeoutLoopbackFlag = true;
+				}
+			}
+		}
+	}
+#endif
+}
 
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 
-            // =========================================================
-            // MENSAGEM 1: Base + 1h (0x01)
-            // =========================================================
-            if (RxHeader.Identifier == 0x00000001)
-            {
+	if (htim->Instance == TIM1) {
+		// Toggle Debug LED
+//		HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_8);
 
-            	uint32_t raw_total_voltage = (RxData[5] << 24) | (RxData[6] << 16) | (RxData[3] << 8) | RxData[4];
-
-            	float float_total_voltage = (float)raw_total_voltage * 1.0f;
-
-            	memset(TxData, 0, 8);
-
-            	memcpy(&TxData[0], &float_total_voltage, sizeof(float));
-
-            	TxData[4] = RxData[0]; // MIN CELL VOLTAGE
-            	TxData[5] = RxData[1]; // MAX CELL VOLTAGE
-            	TxData[6] = RxData[2]; // AVERAGE CELL VOLTAGE
-
-            }
-
-            // =========================================================
-            // MENSAGEM 2: Base + 7h (0x07)
-            // =========================================================
-            else if (RxHeader.Identifier == 0x00000007)
-            {
-
-            	uint32_t raw_protection = (RxData[0] << 24) | (RxData[1] << 16) | (RxData[2] << 8) | RxData[3];
-
-            	float float_protection = (float)raw_protection;
-
-            	memset(TxData, 0, 8);
-
-            	memcpy(&TxData[0], &float_protection, sizeof(float));
-
-            	TxData[4] = RxData[7];	 // BATTERY STATUS FLAGS
-            	TxData[5] = RxData[4];	 // REDUCTION FLAGS
-
-            	TxHeader.Identifier = 0x00000007;
-            }
-
-            // =========================================================
-            // MENSAGEM 3: Base + 5h (0x05)
-            // =========================================================
-            else if (RxHeader.Identifier == 0x00000005)
-            {
-
-                int16_t raw_current = (RxData[0] << 8) | RxData[1];
-
-                float float_current = (float)raw_current * 0.1f;
-
-                memset(TxData, 0, 8);
-
-                memcpy(&TxData[0], &float_current, sizeof(float));
-
-
-                TxData[4] = RxData[2]; // ESTIMATED CHARGE (MSB)
-                TxData[5] = RxData[3]; // ESTIMATED CHARGE (LSB)
-
-                TxData[6] = RxData[6]; // USER STATE OF CHARGE
-                TxData[7] = RxData[7]; // STATE HEALTH
-
-            	TxHeader.Identifier = 0x00000005;
-            }
-
-            // =========================================================
-            // MENSAGEM 4: 0x521
-            // =========================================================
-            else if (RxHeader.Identifier == 0x00000521)
-
-
-            	int32_t raw_current = (int32_t)((RxData[4] << 24) | (RxData[5] << 16) | (RxData[6] << 8) | RxData[7]);
-
-            	float float_current = (float)raw_current;
-
-
-            	memset(TxData, 0, 8);
-
-
-                memcpy(&TxData[0], &float_current, sizeof(float));
-
-
-                TxData[4] = RxData[3]; // MESSAGE TRACKER
-
-
-
-                TxHeader.Identifier = 0x00000521;
-            }
-
-
-        }
-    }
+		/* Defer TX to main loop — retry busy-wait must not run in ISR context,
+		 * otherwise FDCAN1 RX (same prio) starves and BMS frames are lost. */
+		txTelemetryRequest = 1;
+	}
 }
 /* USER CODE END 4 */
 
@@ -438,6 +456,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, SET);
   /* User can add his own implementation to report the HAL error return state */
   __disable_irq();
   while (1)

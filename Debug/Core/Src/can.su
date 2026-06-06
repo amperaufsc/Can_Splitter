@@ -1,0 +1,5 @@
+../Core/Src/can.c:23:23:voltage_to_byte	16	static
+../Core/Src/can.c:36:16:CAN_Transmit	80	static
+../Core/Src/can.c:79:6:CAN_ProcessBMSMessage	56	static
+../Core/Src/can.c:129:6:CAN_SimulateBMS	56	static
+../Core/Src/can.c:158:6:CAN_TransmitTelemetry	56	static
